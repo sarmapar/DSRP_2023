@@ -1,0 +1,268 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+### Supervised Machine Learning
+
+```{r setup}
+
+library(dplyr)
+library(parsnip)
+```
+
+#### Step 1: Collect Data
+
+We will use the iris dataset as an example.
+
+```{r}
+head(iris)
+```
+
+#### Step 2: Clean and Process Data
+
+-   Make sure data is tidy (rows are observations and columns are variables)
+
+-   Optionally, select only the columns of dataset that you are interested in using for the model
+
+-   Either remove rows with NA values or set to column mean
+
+```{r}
+### Examples ###
+## remove rows with NA values
+noNAs <- filter(starwars, !is.na(mass))
+
+## replace with mean
+replaceWithMeans <- mutate(starwars, 
+                           mass = ifelse(is.na(mass), 
+                                         mean(mass), 
+                                         mass))
+```
+
+-   Code categorical variables as numeric integers using `as.integer()` and `factor()`, if needed
+
+    -   If you are using the variable as the outcome for classification, only use `factor()`
+
+    -   If you want to use the variable as a feature, use `as.integer()`
+
+```{r}
+### Examples ###
+## If categorical variable is already a factor
+irisAllNumeric <- mutate(iris, Species = as.integer(Species))
+
+## If categorical variable is character, need to make it a factor first
+intSpecies <- starwars |>
+  mutate(species = as.integer(factor(species)))
+```
+
+-   Normalize numeric values using `scale()`, if needed
+
+```{r}
+### Example ###
+irisNorm <- iris[,1:4] |>
+  scale() |>
+  as.data.frame()
+
+irisNorm$Species <- irisAllNumeric$Species
+```
+
+#### Step 3: Visualize Data
+
+-   Create scatterplots of different variables
+
+-   Use PCA to find variables with high variation
+
+-   Use `cor()` to determine correlation
+
+```{r}
+library(reshape2)
+library(ggplot2)
+
+## Calculate correlations
+irisCorrelation <- cor(irisNorm) |>
+  melt() |>
+  as.data.frame()
+
+## Plot correlations
+ggplot(irisCorrelation, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "darkblue", mid = "white", high = "darkred", midpoint = 0) +
+  theme_minimal()
+
+```
+
+#### Step 4: Perform Feature Selection
+
+-   Start with highly correlated variables
+
+-   Include variables that account for large amounts of variation
+
+#### Step 5: Separate Data into Testing and Training Sets
+
+-   Choose 70-85% of data to put in the training set
+
+```{r}
+library(rsample)
+## Sample subsets for regression modeling
+# Set seed to make random sampling reproducable
+set.seed(479)
+
+# Put 75% of the data into the training set 
+data_reg_split <- initial_split(irisAllNumeric, prop = 0.75)
+
+# Create data frames for the two sets:
+train_reg_data <- training(data_reg_split)
+test_reg_data  <- testing(data_reg_split)
+
+## Sample subsets for classification modeling
+# Put 75% of the data into the training set 
+data_class_split <- initial_split(iris, prop = 0.75)
+
+# Create data frames for the two sets:
+train_class_data <- training(data_class_split)
+test_class_data  <- testing(data_class_split)
+
+```
+
+#### Step 6: Choose Suitable Model
+
+| Model Name             | Function         | Engine         | Mode                         |
+|------------------------|------------------|----------------|------------------------------|
+| Linear Regression      | `linear_reg()`   | "lm" or "glm"  | Regression                   |
+| Logistic Regression    | `logistic_reg()` | "glm"          | Classification               |
+| Boosted Decision Trees | `boost_tree()`   | "xgboost"      | Regression or Classification |
+| Random Forest          | `rand_forest()`  | "randomForest" | Regression or Classification |
+
+See more at <https://parsnip.tidymodels.org/articles/Examples.html>
+
+#### Step 7: Train Model on Training Set
+
+Linear Regression
+
+```{r}
+## Linear model
+linreg_fit <- linear_reg() |>
+  set_engine("lm") |>
+  set_mode("regression") |>
+  fit(Petal.Length ~ ., data = train_reg_data)
+
+summary(linreg_fit$fit)
+```
+
+Logistic Regression
+
+```{r}
+## Logistic model
+# filter to just 2 outcomes
+binary_train_data <- filter(train_class_data, Species %in% c("setosa","virginica"))
+binary_test_data <- filter(test_class_data, Species %in% c("setosa","virginica"))
+
+logreg_fit <- logistic_reg() |>
+  set_engine("glm") |>
+  set_mode("classification") |>
+  fit(Species ~ ., data = binary_train_data)
+
+summary(logreg_fit$fit)
+
+```
+
+Boosting Decision Tree
+
+```{r}
+## Use for regression
+boost_tree_fit <- boost_tree() |>
+  set_engine("xgboost") |>
+  set_mode("regression") |>
+  fit(Sepal.Length ~ ., data = train_reg_data)
+
+boost_tree_fit$fit
+
+## Use for classification
+boost_tree_fit2 <- boost_tree() |>
+  set_engine("xgboost") |>
+  set_mode("classification") |>
+  fit(Species ~., data = train_class_data)
+
+boost_tree_fit2$fit
+```
+
+Random Forest
+
+```{r}
+## Use for regression
+rand_forest_fit <- rand_forest() |>
+  set_engine("ranger") |>
+  set_mode("regression") |>
+  fit(Sepal.Length ~ ., data = train_reg_data)
+
+rand_forest_fit$fit
+
+## Use for classification
+rand_forest_fit2 <- rand_forest() |>
+  set_engine("ranger") |>
+  set_mode("classification") |>
+  fit(Species ~., data = train_class_data)
+
+rand_forest_fit2$fit
+```
+
+#### Step 8: Evaluate Performance on Test Dataset
+
+Use `predict()` with any model to predict the dependent variable.
+
+```{r}
+library(MLmetrics)
+
+## Linear Regression
+irisPred <- test_reg_data
+irisPred$linReg <- predict(linreg_fit, test_reg_data)$.pred
+
+# error
+yardstick::mae(irisPred, truth = Petal.Length, estimate = linReg)
+yardstick::rmse(irisPred, truth = Petal.Length, estimate = linReg)
+
+
+## Logistic Regression
+irisPred <- binary_test_data
+irisPred$logReg <- predict(logreg_fit, binary_test_data)$.pred_class
+
+#f1 score
+F1_Score(irisPred$Species, irisPred$logReg)
+
+
+## Boosted Decision Trees
+# Regression
+irisPred <- test_reg_data
+irisPred$logReg <- predict(boost_tree_fit, test_reg_data)$.pred
+
+# error
+yardstick::mae(irisPred, truth = Sepal.Length, estimate = logReg)
+yardstick::rmse(irisPred, truth = Sepal.Length, estimate = logReg)
+
+# Classification
+irisPred <- test_class_data
+irisPred$logReg <- predict(boost_tree_fit2, test_class_data)$.pred_class
+
+#f1
+F1_Score(irisPred$logReg, irisPred$Species)
+
+
+## Random Forest
+# Regression
+irisPred <- test_reg_data
+irisPred$logReg <- predict(rand_forest_fit, test_reg_data)$.pred
+
+# error
+yardstick::mae(irisPred, truth = Sepal.Length, estimate = logReg)
+yardstick::rmse(irisPred, truth = Sepal.Length, estimate = logReg)
+
+# Classification
+irisPred <- test_class_data
+irisPred$logReg <- predict(rand_forest_fit2, test_class_data)$.pred_class
+
+#f1
+F1_Score(irisPred$logReg, irisPred$Species)
+
+
+```

@@ -1,0 +1,48 @@
+**bold**
+
+**bold**
+
+To make a plot, we use the `ggplot()` function.
+
+###### Header 6
+
+# Header 1
+
+### Header 3
+
+### Plotting
+
+##### Scatter Plot
+
+1.  [GitHub](github.com)
+
+2.  ![](images/exampleJitter2.png){width="5in"}
+
+| Col1 | Col2 | Col3 |
+|------|------|------|
+|      |      |      |
+|      |      |      |
+|      |      |      |
+
+```{r plot, echo=F}
+# this is a comment
+library(ggplot2)
+
+ggplot(data = mpg, aes(x = hwy)) + geom_density()
+
+```
+
+Add text between chunks:
+
+```{r}
+
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```

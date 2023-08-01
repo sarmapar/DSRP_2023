@@ -1,3 +1,5 @@
+library(dplyr)
+
 ## Unsupervised Learning ####
 ## Principal Components Analysis 
 head(iris)
@@ -11,7 +13,8 @@ pcas <- prcomp(iris_num, scale. = T)
 summary(pcas)
 pcas$rotation
 
-pcas$rotation^2
+variancePercentages <- as.data.frame(pcas$rotation^2)
+arrange(variancePercentages, desc(PC1))
 
 ## get the x values of PCAs and make it a data frame
 pca_vals <- as.data.frame(pcas$x)
@@ -207,7 +210,6 @@ yardstick::rmse(reg_results, Sepal.Length, forest_pred)
 
 
 # Calculate accuracy for classification models
-install.packages("Metrics")
 library(Metrics)
 class_results <- class_test
 
@@ -221,9 +223,14 @@ class_results$forest_pred <- predict(forest_class_fit, class_test)$.pred_class
 
 
 class_results$Species == "setosa"
+class_results$log_pred == "setosa"
+
+f1(class_results$Species == "virginica", class_results$log_pred == "virginica")
 
 
+results <- data.frame(predictions = c(1,0,1,0,1,0,1,1),
+                      actual = c(1,0,1,1,0,0,1,0))
+Metrics::accuracy(results$predictions, results$actual)
 
-
-
-
+library(vip)
+vip(forest_class_fit)

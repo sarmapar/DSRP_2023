@@ -23,7 +23,7 @@ anova_results <- aov(Sepal.Width ~ Species, iris)
 summary(anova_results)
 
 ## Which ones?
-TukeyHSD(anova_results)
+tukeyResults <- TukeyHSD(anova_results)$Species
 
 
 ## Is there a significant difference in the mean petal lengths or petal widths by species?
@@ -80,7 +80,7 @@ chisq_result$residuals
 install.packages("corrplot")
 library(corrplot)
 
-corrplot(chisq_result$residuals)
+corrplot(chisq_result$residuals, is.cor = F)
 
 
 ## chi-squared full analysis
